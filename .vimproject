@@ -1,0 +1,14 @@
+redis_quadtree=~/projects/redis_quadtree {
+ Makefile
+
+ include=~/projects/redis_quadtree/include {
+  util.hpp
+  quadtree.hpp
+ }
+
+ src=~/projects/redis_quadtree/src {
+  util.cpp
+  quadtree.cpp
+  main.cpp
+ }
+}
