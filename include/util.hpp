@@ -25,7 +25,7 @@ class rectangle {
         const bool intersects (const rectangle& _rect);
 
     public:
-        int x, y, width, height;
+        int x, y, x2, y2, width, height;
 };
 
 #endif
