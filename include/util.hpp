@@ -15,7 +15,8 @@ class point {
         union {
             struct {
                 uint32_t x, y;
-            } __attribute ((__packed__));
+            //} __attribute ((__packed__));
+            };
             unsigned char bytes[8];
         };
 };
@@ -37,7 +38,8 @@ class rectangle {
                 uint32_t x, y;
                 uint32_t x2, y2;
                 uint32_t width, height;
-            } __attribute__ ((__packed__));
+            //} __attribute__ ((__packed__));
+            };
             unsigned char bytes[24];
         };
 };
