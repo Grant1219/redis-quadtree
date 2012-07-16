@@ -2,21 +2,28 @@
 #define REDIS_QUADTREE_UTIL_HPP
 
 #include <string>
+#include <cstdint>
 #include <hiredis/hiredis.h>
 
 class point {
     public:
-        point (int _x, int _y)
+        point () {}
+        point (uint32_t _x, uint32_t _y)
             : x (_x), y (_y) {}
 
     public:
-        int x;
-        int y;
+        union {
+            struct {
+                uint32_t x, y;
+            } __attribute ((__packed__));
+            unsigned char bytes[8];
+        };
 };
 
 class rectangle {
     public:
-        rectangle (int _x, int _y, int _width, int _height);
+        rectangle () {}
+        rectangle (uint32_t _x, uint32_t _y, uint32_t _width, uint32_t _height);
         rectangle (redisContext* _context, std::string _key);
 
         const bool contains (const point& _point);
@@ -25,7 +32,14 @@ class rectangle {
         const bool intersects (const rectangle& _rect);
 
     public:
-        int x, y, x2, y2, width, height;
+        union {
+            struct {
+                uint32_t x, y;
+                uint32_t x2, y2;
+                uint32_t width, height;
+            } __attribute__ ((__packed__));
+            unsigned char bytes[24];
+        };
 };
 
 #endif

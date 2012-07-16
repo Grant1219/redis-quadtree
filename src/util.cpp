@@ -1,8 +1,6 @@
-#include <iostream>
-
 #include <util.hpp>
 
-rectangle::rectangle (int _x, int _y, int _width, int _height)
+rectangle::rectangle (uint32_t _x, uint32_t _y, uint32_t _width, uint32_t _height)
     : x (_x), y (_y), x2 (_x + _width), y2 (_y + _height), width (_width), height (_height) {
 }
 

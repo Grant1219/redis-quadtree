@@ -1,3 +1,4 @@
+#include <ctime>
 #include <iostream>
 #include <quadtree.hpp>
 
@@ -14,7 +15,20 @@ int main (int argcontext, char** argv) {
     }
 
     quadtree qtree (context, rectangle (0, 0, 4096, 4096) );
-    qtree.test ();
+
+    int nextId = 1;
+    std::list<entity> ents;
+
+    srand (time (NULL) );
+    for (int i = 0; i < 20; i++) {
+        entity ent;
+        ent.id = nextId;
+        ent.pos = point (rand () % 4095 + 1, rand () % 4095 + 1);
+        ents.push_back (ent);
+        qtree.insert_entity (ent);
+
+        nextId++;
+    }
 
     /*
     void* reply;
