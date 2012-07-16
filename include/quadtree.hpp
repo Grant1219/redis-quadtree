@@ -19,7 +19,7 @@ struct entity {
 struct node {
     std::string key;
     bool subdivided;
-    int entities;
+    uint32_t entities;
     rectangle rect;
 };
 
@@ -34,7 +34,7 @@ class quadtree {
         void get_entities (const rectangle& _rect, std::list<entity>& _ents);
 
     private:
-        void subdivide (const node& _node);
+        bool subdivide (const node& _node);
         void clean (const node& _node);
 
         void get_node (const std::string& _nodeKey, node& _node);
@@ -48,7 +48,8 @@ class quadtree {
 
     private:
         redisContext* context;
-        const int maxEntitiesPerNode;
+        const uint32_t maxEntitiesPerNode;
+        const uint32_t minNodeSize;
 };
 
 #endif

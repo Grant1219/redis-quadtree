@@ -20,7 +20,7 @@ int main (int argcontext, char** argv) {
     std::list<entity> ents;
 
     srand (time (NULL) );
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 500; i++) {
         entity ent;
         ent.id = nextId;
         ent.pos = point (rand () % 4095 + 1, rand () % 4095 + 1);

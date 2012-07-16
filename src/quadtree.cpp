@@ -4,7 +4,7 @@
 #include <quadtree.hpp>
 
 quadtree::quadtree (redisContext* _context, const rectangle& _rect)
-    : maxEntitiesPerNode (10) {
+    : maxEntitiesPerNode (10), minNodeSize (8) {
     context = _context;
 
     // check if the root already exists
@@ -12,7 +12,7 @@ quadtree::quadtree (redisContext* _context, const rectangle& _rect)
     reply = (redisReply*)redisCommand (context, "EXISTS root");
 
     if (reply->type == REDIS_REPLY_INTEGER && reply->integer == 0) {
-        std::cout << "Creating quadtree with size (" << _rect.x << ", " << _rect.y << ", " << _rect.width << ", " << _rect.height << ")" << std::endl;
+        //std::cout << "Creating quadtree with size (" << _rect.x << ", " << _rect.y << ", " << _rect.width << ", " << _rect.height << ")" << std::endl;
         // setup the base of the quadtree in redis
         redisAppendCommand (context, "HSET root subdivided 0");
         redisAppendCommand (context, "HSET root entities 0");
@@ -49,7 +49,13 @@ void quadtree::insert_entity (entity& _ent) {
             else {
                 // subdivide if needed
                 if (!currNode.subdivided) {
-                    subdivide (currNode);
+                    if (!subdivide (currNode) ) {
+                        // this is as small as the nodes can get, add the entity here
+                        add_entity (currNode, _ent);
+                        done = true;
+
+                        //std::cout << "Minimum node size reached, cannot subdivide " << currNode.key << std::endl;
+                    }
                 }
 
                 // figure out which subnode the entity should move into
@@ -58,6 +64,7 @@ void quadtree::insert_entity (entity& _ent) {
                 if (stayParent) {
                     // if this entity won't fit in the subnodes it stays here
                     add_entity (currNode, _ent);
+                    done = true;
                 }
                 else {
                     // change the level down one
@@ -78,8 +85,12 @@ void quadtree::relocate_entity (entity& _ent) {
 void quadtree::get_entities (const rectangle& _rect, std::list<entity>& _ents) {
 }
 
-void quadtree::subdivide (const node& _node) {
-    std::cout << "Subdividing at node: " << _node.key << std::endl;
+bool quadtree::subdivide (const node& _node) {
+    //std::cout << "Subdividing at node: " << _node.key << std::endl;
+
+    // don't subdivide if we've reached the minimum
+    if (_node.rect.width / 2 < minNodeSize || _node.rect.height / 2 < minNodeSize)
+        return false;
 
     redisReply* reply;
     const char* nodeKey = _node.key.c_str ();
@@ -100,8 +111,8 @@ void quadtree::subdivide (const node& _node) {
     point size (_node.rect.width / 2, _node.rect.height / 2);
     point mid (_node.rect.x + size.x, _node.rect.y + size.y);
 
-    std::cout << "Size of children: (" << size.x << ", " << size.y << ")" << std::endl;
-    std::cout << "Midpoint: (" << mid.x << ", " << mid.y << ")" << std::endl;
+    //std::cout << "Size of children: (" << size.x << ", " << size.y << ")" << std::endl;
+    //std::cout << "Midpoint: (" << mid.x << ", " << mid.y << ")" << std::endl;
 
     // top left rectangle
     rectangle tlRect (_node.rect.x, _node.rect.y, size.x, size.y);
@@ -144,7 +155,7 @@ void quadtree::subdivide (const node& _node) {
     std::list<entity> ents;
     get_entities (_node, ents);
 
-    std::cout << "Moving " << ents.size () << " entities down to subnodes" << std::endl;
+    //std::cout << "Moving " << ents.size () << " entities down to subnodes" << std::endl;
 
     if (ents.size () > 0) {
         // move all the entities in this node down if possible
@@ -156,6 +167,8 @@ void quadtree::subdivide (const node& _node) {
             }
         }
     }
+
+    return true;
 }
 
 void quadtree::clean (const node& _node) {
@@ -183,7 +196,7 @@ void quadtree::get_node (const std::string& _nodeKey, node& _node) {
 
 void quadtree::get_destination_node (const entity& _ent, const node& _currNode, node& _destNode, bool& _stayParent) {
     _stayParent = true;
-    
+ 
     node tlNode, trNode, blNode, brNode;
     get_node (_currNode.key + ":tl", tlNode);
     get_node (_currNode.key + ":tr", trNode);
@@ -193,63 +206,88 @@ void quadtree::get_destination_node (const entity& _ent, const node& _currNode, 
     if (tlNode.rect.contains (_ent.pos) ) {
         _destNode = tlNode;
         _stayParent = false;
+
+        //std::cout << "Found destination node " << _destNode.key << std::endl;
     }
     else if (trNode.rect.contains (_ent.pos) ) {
         _destNode = trNode;
         _stayParent = false;
+
+        //std::cout << "Found destination node " << _destNode.key << std::endl;
     }
     else if (blNode.rect.contains (_ent.pos) ) {
         _destNode = blNode;
         _stayParent = false;
+
+        //std::cout << "Found destination node " << _destNode.key << std::endl;
     }
     else if (brNode.rect.contains (_ent.pos) ) {
         _destNode = brNode;
         _stayParent = false;
+
+        //std::cout << "Found destination node " << _destNode.key << std::endl;
     }
 }
 
 void quadtree::add_entity (const node& _node, entity& _ent) {
-    std::cout << "Adding entity " << _ent.id << " to " << _node.key << " at (" << _ent.pos.x << ", " << _ent.pos.y << ")" << std::endl;
-    redisReply* reply;
-    
-    reply = (redisReply*)redisCommand (context, "HINCRBY %s entities 1", _node.key.c_str () );
-    reply = (redisReply*)redisCommand (context, "SADD %s:entities %i", _node.key.c_str (), _ent.id);
+    //std::cout << "Adding entity " << _ent.id << " to " << _node.key << " at (" << _ent.pos.x << ", " << _ent.pos.y << ")" << std::endl;
 
     _ent.key = "entities:" + std::to_string (_ent.id);
     _ent.ownerKey = _node.key;
 
+    // update the node
+    redisAppendCommand (context, "HINCRBY %s entities 1", _node.key.c_str () );
+    redisAppendCommand (context, "SADD %s:entities %i", _node.key.c_str (), _ent.id);
+
     // add the entity into redis
-    reply = (redisReply*)redisCommand (context, "HSET %s x %i", _ent.key.c_str (), _ent.pos.x);
-    reply = (redisReply*)redisCommand (context, "HSET %s y %i", _ent.key.c_str (), _ent.pos.y);
-    reply = (redisReply*)redisCommand (context, "HSET %s owner %s", _ent.key.c_str (), _ent.ownerKey.c_str () );
+    redisAppendCommand (context, "HSET %s x %i", _ent.key.c_str (), _ent.pos.x);
+    redisAppendCommand (context, "HSET %s y %i", _ent.key.c_str (), _ent.pos.y);
+    redisAppendCommand (context, "HSET %s owner %s", _ent.key.c_str (), _ent.ownerKey.c_str () );
+ 
+    redisReply* reply;
+    for (int n = 0; n < 5; n++) {
+        redisGetReply (context, (void**)&reply);
+        freeReplyObject (reply);
+    }
 }
 
 void quadtree::delete_entity (entity& _ent) {
-    redisReply* reply;
-
-    // remove the entity from redis
-    reply = (redisReply*)redisCommand (context, "HINCRBY %s entities -1", _ent.ownerKey.c_str () );
-    reply = (redisReply*)redisCommand (context, "SREM %s:entities %i", _ent.ownerKey.c_str (), _ent.id);
-    reply = (redisReply*)redisCommand (context, "HDEL %s x", _ent.key.c_str () );
-    reply = (redisReply*)redisCommand (context, "HDEL %s y", _ent.key.c_str () );
-    reply = (redisReply*)redisCommand (context, "HDEL %s owner", _ent.key.c_str () );
+    // remove the entity from redis and update the node
+    redisAppendCommand (context, "HINCRBY %s entities -1", _ent.ownerKey.c_str () );
+    redisAppendCommand (context, "SREM %s:entities %i", _ent.ownerKey.c_str (), _ent.id);
+    redisAppendCommand (context, "HDEL %s x", _ent.key.c_str () );
+    redisAppendCommand (context, "HDEL %s y", _ent.key.c_str () );
+    redisAppendCommand (context, "HDEL %s owner", _ent.key.c_str () );
 
     _ent.key = "";
     _ent.ownerKey = "";
+
+    redisReply* reply;
+    for (int n = 0; n < 5; n++) {
+        redisGetReply (context, (void**)&reply);
+        freeReplyObject (reply);
+    }
 }
 
 void quadtree::move_entity (entity& _ent, const node& _srcNode, const node& _destNode) {
-    std::cout << "Moving entity " << _ent.id << " from " << _srcNode.key << " to " << _destNode.key << std::endl;
-    redisReply* reply;
+    //std::cout << "Moving entity " << _ent.id << " from " << _srcNode.key << " to " << _destNode.key << std::endl;
 
-    reply = (redisReply*)redisCommand (context, "HINCRBY %s entities -1", _srcNode.key.c_str () );
-    reply = (redisReply*)redisCommand (context, "HINCRBY %s entities 1", _destNode.key.c_str () );
-    reply = (redisReply*)redisCommand (context, "SREM %s:entities %i", _srcNode.key.c_str (), _ent.id);
-    reply = (redisReply*)redisCommand (context, "SADD %s:entities %i", _destNode.key.c_str (), _ent.id);
+    // update both nodes entity info
+    redisAppendCommand (context, "HINCRBY %s entities -1", _srcNode.key.c_str () );
+    redisAppendCommand (context, "HINCRBY %s entities 1", _destNode.key.c_str () );
+    redisAppendCommand (context, "SREM %s:entities %i", _srcNode.key.c_str (), _ent.id);
+    redisAppendCommand (context, "SADD %s:entities %i", _destNode.key.c_str (), _ent.id);
 
-    reply = (redisReply*)redisCommand (context, "HSET %s owner %s", _ent.key.c_str (), _destNode.key.c_str () );
+    // change the entity's owner
+    redisAppendCommand (context, "HSET %s owner %s", _ent.key.c_str (), _destNode.key.c_str () );
 
     _ent.ownerKey = _destNode.key;
+
+    redisReply* reply;
+    for (int n = 0; n < 5; n++) {
+        redisGetReply (context, (void**)&reply);
+        freeReplyObject (reply);
+    }
 }
 
 void quadtree::get_entities (const node& _node, std::list<entity>& _ents) {
