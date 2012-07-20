@@ -19,14 +19,14 @@ rectangle::rectangle (redisContext* _context, std::string _key) {
     }
 }
 
-const bool rectangle::contains (const point& _point) {
+const bool rectangle::contains (const point& _point) const {
     return (_point.x > x && _point.y > y && _point.x < x2 && _point.y < y2);
 }
 
-const bool rectangle::contains (const rectangle& _rect) {
+const bool rectangle::contains (const rectangle& _rect) const {
     return (_rect.x > x && _rect.y > y && _rect.x2 < x2 && _rect.y2 < y2);
 }
 
-const bool rectangle::intersects (const rectangle& _rect) {
+const bool rectangle::intersects (const rectangle& _rect) const {
     return !(_rect.x > x2 || _rect.x2 < x || _rect.y > y2 || _rect.y2 < y);
 }

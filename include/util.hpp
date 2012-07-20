@@ -27,10 +27,10 @@ class rectangle {
         rectangle (uint32_t _x, uint32_t _y, uint32_t _width, uint32_t _height);
         rectangle (redisContext* _context, std::string _key);
 
-        const bool contains (const point& _point);
-        const bool contains (const rectangle& _rect);
+        const bool contains (const point& _point) const;
+        const bool contains (const rectangle& _rect) const;
 
-        const bool intersects (const rectangle& _rect);
+        const bool intersects (const rectangle& _rect) const;
 
     public:
         union {
