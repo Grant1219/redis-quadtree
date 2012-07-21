@@ -14,7 +14,7 @@ int main (int argcontext, char** argv) {
     srand (time (NULL) );
     time_t start, stop;
     int nextId = 1;
-    int entityNum = 20;
+    int entityNum = 100;
     std::vector<entity> ents;
 
     start = time (NULL);
@@ -48,7 +48,8 @@ int main (int argcontext, char** argv) {
     start = time (NULL);
     for (std::vector<entity>::iterator it = ents.begin (); it != ents.end (); it++) {
         qtree.get_entity ( (*it).id, *it);
-        qtree.remove_entity (*it);
+        if ( (*it).ownerKey != "")
+            qtree.remove_entity (*it);
     }
     stop = time (NULL);
 

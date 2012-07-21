@@ -58,7 +58,7 @@ void quadtree::get_entity (uint32_t _id, entity& _ent) {
         freeReplyObject (reply);
     }
 
-    std::cout << "Got entity (" << _ent.key << ", " << _ent.ownerKey << ")" << std::endl;
+    //std::cout << "Got entity (" << _ent.key << ", " << _ent.ownerKey << ")" << std::endl;
 }
 
 void quadtree::insert_entity (entity& _ent) {
@@ -135,7 +135,7 @@ void quadtree::get_entities (const rectangle& _rect, std::vector<entity>& _ents)
 }
 
 bool quadtree::subdivide (const node& _node) {
-    std::cout << "Subdividing at node: " << _node.key << std::endl;
+    //std::cout << "Subdividing at node: " << _node.key << std::endl;
 
     // don't subdivide if we've reached the minimum
     if (_node.rect.width / 2 < minNodeSize || _node.rect.height / 2 < minNodeSize)
@@ -204,7 +204,7 @@ bool quadtree::subdivide (const node& _node) {
     std::vector<entity> ents;
     get_node_entities (_node, ents);
 
-    std::cout << "Moving " << ents.size () << " entities down to subnodes" << std::endl;
+    //std::cout << "Moving " << ents.size () << " entities down to subnodes" << std::endl;
 
     if (ents.size () > 0) {
         // move all the entities in this node down if possible
@@ -221,7 +221,7 @@ bool quadtree::subdivide (const node& _node) {
 }
 
 void quadtree::clean (node& _node) {
-    std::cout << "Cleaning node " << _node.key << std::endl;
+    //std::cout << "Cleaning node " << _node.key << std::endl;
     if (_node.subdivided) {
         bool empty = true;
         delete_empty_subnodes (_node.key, empty);
@@ -307,7 +307,7 @@ void quadtree::get_destination_node (const entity& _ent, const node& _currNode, 
 }
 
 void quadtree::add_entity (const node& _node, entity& _ent) {
-    std::cout << "Adding entity " << _ent.id << " to " << _node.key << " at (" << _ent.pos.x << ", " << _ent.pos.y << ")" << std::endl;
+    //std::cout << "Adding entity " << _ent.id << " to " << _node.key << " at (" << _ent.pos.x << ", " << _ent.pos.y << ")" << std::endl;
 
     _ent.key = "entities:" + std::to_string (_ent.id);
     _ent.ownerKey = _node.key;
@@ -342,7 +342,7 @@ void quadtree::update_entity (const entity& _ent) {
 }
 
 void quadtree::delete_entity (entity& _ent) {
-    std::cout << "Deleting entity " << _ent.id << " from " << _ent.ownerKey << std::endl;
+    //std::cout << "Deleting entity " << _ent.id << " from " << _ent.ownerKey << std::endl;
 
     // remove the entity from redis and update the node
     redisAppendCommand (context, "HINCRBY %s entities -1", _ent.ownerKey.c_str () );
@@ -362,7 +362,7 @@ void quadtree::delete_entity (entity& _ent) {
 }
 
 void quadtree::move_entity (entity& _ent, const node& _srcNode, const node& _destNode) {
-    std::cout << "Moving entity " << _ent.id << " from " << _srcNode.key << " to " << _destNode.key << std::endl;
+    //std::cout << "Moving entity " << _ent.id << " from " << _srcNode.key << " to " << _destNode.key << std::endl;
 
     // update both nodes entity info
     redisAppendCommand (context, "HINCRBY %s entities -1", _srcNode.key.c_str () );
@@ -531,34 +531,32 @@ void quadtree::get_all_entities (const node& _node, std::vector<entity>& _ents) 
 }
 
 void quadtree::delete_empty_subnodes (const std::string& _nodeKey, bool& empty) {
-    std::cout << "Deleting empty subnodes for node " << _nodeKey << std::endl;
+    //std::cout << "Checking for empty subnodes for node " << _nodeKey << std::endl;
 
-    std::string quads[4] = {_nodeKey + ":tl", _nodeKey + ":tr", _nodeKey + ":bl", _nodeKey + ":br"};
+    const char* nodeKey = _nodeKey.c_str ();
+    const char* quads[4] = {"tl", "tr", "bl", "br"};
 
     // first check if these subnodes contain any entities
     for (int i = 0; i < 4; i++) {
-        std::cout << "HGET " << quads[i] << " entities" << std::endl;
-        redisAppendCommand (context, "HGET %s entities", quads[i].c_str () );
+        //std::cout << "HGET " << nodeKey << ":" << quads[i] << " entities" << std::endl;
+        redisAppendCommand (context, "HGET %s:%s entities", nodeKey, quads[i]);
     }
 
     redisReply* reply;
     for (int n = 0; n < 4; n++) {
         redisGetReply (context, (void**)&reply);
 
-        if (reply->type == REDIS_REPLY_STRING && strncmp (reply->str, "0", 1) == 0) {
+        if (reply->type == REDIS_REPLY_STRING && strncmp (reply->str, "0", 1) != 0) {
             empty = false;
-            std::cout << "Node " << quads[n] << " is not empty" << std::endl;
+            //std::cout << "Node " << nodeKey << ":" << quads[n] << " is not empty" << std::endl;
         }
         freeReplyObject (reply);
-
-        if (!empty)
-            break;
     }
 
     if (empty) {
         // continue on to the subnodes if there are any
         for (int i = 0; i < 4; i++) {
-            redisAppendCommand (context, "HGET %s subdivided", quads[i].c_str () );
+            redisAppendCommand (context, "HGET %s:%s subdivided", nodeKey, quads[i]);
         }
 
         for (int i = 0; i < 4; i++) {
@@ -566,36 +564,41 @@ void quadtree::delete_empty_subnodes (const std::string& _nodeKey, bool& empty) 
 
             // only recurse into subnodes if they are subdivided
             if (reply->type == REDIS_REPLY_STRING && strncmp (reply->str, "1", 1) == 0) {
-                delete_empty_subnodes (quads[i].c_str (), empty);
+                std::string key = _nodeKey + ":";
+                key += quads[i];
+                delete_empty_subnodes (key, empty);
             }
             freeReplyObject (reply);
-
-            if (!empty)
-                break;
         }
     }
 
     // delete only this node's subnodes (everything below has been deleted or never existed)
-    if (empty) {
-        std::cout << "Delete subnodes for node " << _nodeKey << std::endl;
-        //delete_subnodes (_nodeKey);
-    }
+    if (empty)
+        delete_subnodes (_nodeKey);
 }
 
 void quadtree::delete_subnodes (const std::string& _nodeKey) {
-    std::string quads[4] = {_nodeKey + ":tl", _nodeKey + ":tr", _nodeKey + ":bl", _nodeKey + ":br"};
+    //std::cout << "Deleting subnodes for node " << _nodeKey << std::endl;
+
+    const char* nodeKey = _nodeKey.c_str ();
+    const char* quads[4] = {"tl", "tr", "bl", "br"};
  
     // delete the hashes for each node
     for (int i = 0; i < 4; i++) {
-        redisAppendCommand (context, "HDEL %s:%s subdivided", quads[i].c_str () );
-        redisAppendCommand (context, "HDEL %s:%s entities", quads[i].c_str () );
+        redisAppendCommand (context, "HDEL %s:%s subdivided", nodeKey, quads[i]);
+        redisAppendCommand (context, "HDEL %s:%s entities", nodeKey, quads[i]);
+
+        redisAppendCommand (context, "HDEL %s:%s:rect x", nodeKey, quads[i]);
+        redisAppendCommand (context, "HDEL %s:%s:rect y", nodeKey, quads[i]);
+        redisAppendCommand (context, "HDEL %s:%s:rect w", nodeKey, quads[i]);
+        redisAppendCommand (context, "HDEL %s:%s:rect h", nodeKey, quads[i]);
     }
 
     // reset this node to an unsubdivided state
-    redisAppendCommand (context, "HSET %s subdivided 0", _nodeKey.c_str () );
+    redisAppendCommand (context, "HSET %s subdivided 0", nodeKey);
 
     redisReply* reply;
-    for (int n = 0; n < 9; n++) {
+    for (int n = 0; n < 25; n++) {
         redisGetReply (context, (void**)&reply);
         freeReplyObject (reply);
     }
