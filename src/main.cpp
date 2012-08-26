@@ -14,7 +14,7 @@ int main (int argcontext, char** argv) {
     srand (time (NULL) );
     time_t start, stop;
     int nextId = 1;
-    int entityNum = 100;
+    int entityNum = 20;
     std::vector<entity> ents;
 
     start = time (NULL);
